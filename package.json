@@ -1,0 +1,21 @@
+{
+  "name": "deepshell",
+  "version": "0.1.0",
+  "description": "A CLI roguelike dungeon crawler in TypeScript",
+  "type": "module",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/main.js",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "keywords": ["roguelike", "cli", "dungeon-crawler", "ascii"],
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "vitest": "^3.2.1",
+    "fast-check": "^4.1.1",
+    "@types/node": "^22.15.0"
+  }
+}
