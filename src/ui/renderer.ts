@@ -1,57 +1,90 @@
+import chalk from 'chalk';
 import type { GameState, RunStats, Perk, Floor, Enemy, ItemPlacement, SkillType } from '../models/index.js';
 import { ASCII_CHARS } from '../models/index.js';
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+import { THEME, hpColor, colorizeMessage } from './colors.js';
 
 function enemyChar(enemy: Enemy): string {
-  if (enemy.isBoss) return ASCII_CHARS.boss;
-  switch (enemy.behavior) {
-    case 'melee': return ASCII_CHARS.meleeEnemy;
-    case 'ranged': return ASCII_CHARS.rangedEnemy;
-    case 'patrol': return ASCII_CHARS.patrolEnemy;
-  }
+  const char = enemy.isBoss
+    ? ASCII_CHARS.boss
+    : enemy.behavior === 'melee'
+      ? ASCII_CHARS.meleeEnemy
+      : enemy.behavior === 'ranged'
+        ? ASCII_CHARS.rangedEnemy
+        : ASCII_CHARS.patrolEnemy;
+
+  const colorFn = enemy.isBoss
+    ? THEME.entities.boss
+    : enemy.behavior === 'melee'
+      ? THEME.entities.meleeEnemy
+      : enemy.behavior === 'ranged'
+        ? THEME.entities.rangedEnemy
+        : THEME.entities.patrolEnemy;
+
+  return colorFn(char);
 }
 
 function itemChar(placement: ItemPlacement): string {
-  switch (placement.item.category) {
-    case 'weapon': return ASCII_CHARS.weapon;
-    case 'armor': return ASCII_CHARS.armor;
-    default: return ASCII_CHARS.item;
-  }
+  const char = placement.item.category === 'weapon'
+    ? ASCII_CHARS.weapon
+    : placement.item.category === 'armor'
+      ? ASCII_CHARS.armor
+      : ASCII_CHARS.item;
+
+  const colorFn = placement.item.category === 'weapon'
+    ? THEME.items.weapon
+    : placement.item.category === 'armor'
+      ? THEME.items.armor
+      : THEME.items.item;
+
+  return colorFn(char);
 }
 
-// ─── render ──────────────────────────────────────────────────────────────────
+function tileChar(type: string, char: string): string {
+  const colorFn = type === 'wall'
+    ? THEME.map.wall
+    : type === 'door'
+      ? THEME.map.door
+      : type === 'stairsUp'
+        ? THEME.map.stairsUp
+        : type === 'stairsDown'
+          ? THEME.map.stairsDown
+          : THEME.map.floor;
+
+  return colorFn(char);
+}
 
 export function render(state: GameState): string {
   const { currentFloor, player, messageLog, floorNumber } = state;
   const lines: string[] = [];
 
-  // Map region
   const mapLines = renderMap(currentFloor, player.position, currentFloor.enemies, currentFloor.items);
   lines.push(...mapLines);
 
-  // Blank separator
   lines.push('');
 
-  // HUD region
   const weaponName = player.equippedWeapon ? player.equippedWeapon.name : 'none';
   const armorName = player.equippedArmor ? player.equippedArmor.name : 'none';
-  let hud = `HP: ${player.health}/${player.maxHealth}  Lvl: ${player.level}  XP: ${player.xp}  Weapon: ${weaponName}  Armor: ${armorName}  Floor: ${floorNumber}`;
+
+  const hpStr = hpColor(player.health, player.maxHealth)(`${player.health}/${player.maxHealth}`);
+  const hud = [
+    `${THEME.hud.label('HP:')} ${hpStr}`,
+    `${THEME.hud.label('Lvl:')} ${THEME.hud.value(String(player.level))}`,
+    `${THEME.hud.label('XP:')} ${THEME.hud.value(String(player.xp))}`,
+    `${THEME.hud.label('Weapon:')} ${THEME.hud.value(weaponName)}`,
+    `${THEME.hud.label('Armor:')} ${THEME.hud.value(armorName)}`,
+    `${THEME.hud.label('Floor:')} ${THEME.hud.value(String(floorNumber))}`,
+  ].join('  ');
 
   const bossAlive = currentFloor.isBossFloor &&
     currentFloor.enemies.some(e => e.isBoss && e.health > 0);
-  if (bossAlive) {
-    hud += '  [BOSS FLOOR]';
-  }
-  lines.push(hud);
 
-  // Blank separator
+  lines.push(bossAlive ? `${hud}  ${THEME.hud.bossFloor('[BOSS FLOOR]')}` : hud);
+
   lines.push('');
 
-  // Message log region — last 5 messages
   const recentMessages = messageLog.slice(-5);
   for (const msg of recentMessages) {
-    lines.push(msg);
+    lines.push(colorizeMessage(msg));
   }
 
   return lines.join('\n');
@@ -66,7 +99,6 @@ function renderMap(
   const { grid } = floor;
   const lines: string[] = [];
 
-  // Build lookup maps for enemies and items by position
   const enemyMap = new Map<string, Enemy>();
   for (const enemy of enemies) {
     if (enemy.health > 0) {
@@ -76,7 +108,6 @@ function renderMap(
 
   const itemMap = new Map<string, ItemPlacement>();
   for (const placement of items) {
-    // Last item at position wins (items can stack; show topmost)
     itemMap.set(`${placement.position.x},${placement.position.y}`, placement);
   }
 
@@ -84,7 +115,7 @@ function renderMap(
     let row = '';
     for (let x = 0; x < grid[y].length; x++) {
       if (x === playerPos.x && y === playerPos.y) {
-        row += ASCII_CHARS.player;
+        row += THEME.entities.player(ASCII_CHARS.player);
       } else {
         const key = `${x},${y}`;
         const enemy = enemyMap.get(key);
@@ -95,7 +126,7 @@ function renderMap(
           if (item) {
             row += itemChar(item);
           } else {
-            row += grid[y][x].char;
+            row += tileChar(grid[y][x].type, grid[y][x].char);
           }
         }
       }
@@ -107,80 +138,79 @@ function renderMap(
 }
 
 
-// ─── renderTitleScreen ───────────────────────────────────────────────────────
-
 export function renderTitleScreen(seed?: string): string {
   const lines: string[] = [];
 
+  const titleLines = [
+    '  ____  _____ _____ ____  ____  _   _ _____ _     _     ',
+    ' |  _ \\| ____| ____|  _ \\/ ___|| | | | ____| |   | |    ',
+    ' | | | |  _| |  _| | |_) \\___ \\| |_| |  _| | |   | |    ',
+    ' | |_| | |___| |___|  __/ ___) |  _  | |___| |___| |___ ',
+    ' |____/|_____|_____|_|   |____/|_| |_|_____|_____|_____|',
+  ];
+
   lines.push('');
-  lines.push('  ____  _____ _____ ____  ____  _   _ _____ _     _     ');
-  lines.push(' |  _ \\| ____| ____|  _ \\/ ___|| | | | ____| |   | |    ');
-  lines.push(' | | | |  _| |  _| | |_) \\___ \\| |_| |  _| | |   | |    ');
-  lines.push(' | |_| | |___| |___|  __/ ___) |  _  | |___| |___| |___ ');
-  lines.push(' |____/|_____|_____|_|   |____/|_| |_|_____|_____|_____|');
+  for (const line of titleLines) {
+    lines.push(THEME.screens.title(line));
+  }
+
   lines.push('');
-  lines.push('  1. New Game');
-  lines.push('  2. New Game with Seed');
-  lines.push('  3. View High Scores');
-  lines.push('  4. Quit');
+  lines.push(`  ${chalk.white('1.')} New Game`);
+  lines.push(`  ${chalk.white('2.')} New Game with Seed`);
+  lines.push(`  ${chalk.white('3.')} View High Scores`);
+  lines.push(`  ${chalk.white('4.')} Quit`);
   lines.push('');
 
   if (seed) {
-    lines.push(`  Current seed: ${seed}`);
+    lines.push(`  Current seed: ${chalk.gray(seed)}`);
     lines.push('');
   }
 
   return lines.join('\n');
 }
 
-// ─── renderGameOver ──────────────────────────────────────────────────────────
-
 export function renderGameOver(stats: RunStats, seed: string): string {
   const lines: string[] = [];
   const skillTypes: SkillType[] = ['melee', 'ranged', 'defense', 'stealth', 'perception'];
 
   lines.push('');
-  lines.push('  === GAME OVER ===');
+  lines.push(`  ${THEME.screens.gameOver('=== GAME OVER ===')}`);
   lines.push('');
-  lines.push(`  Floors Cleared: ${stats.floorsCleared}`);
-  lines.push(`  Enemies Defeated: ${stats.enemiesDefeated}`);
-  lines.push(`  Bosses Defeated: ${stats.bossesDefeated}`);
+  lines.push(`  ${THEME.screens.gameOverLabel('Floors Cleared:')} ${chalk.white(stats.floorsCleared)}`);
+  lines.push(`  ${THEME.screens.gameOverLabel('Enemies Defeated:')} ${chalk.white(stats.enemiesDefeated)}`);
+  lines.push(`  ${THEME.screens.gameOverLabel('Bosses Defeated:')} ${chalk.white(stats.bossesDefeated)}`);
   lines.push('');
-  lines.push('  Highest Skill Levels:');
+  lines.push(`  ${THEME.screens.gameOverLabel('Highest Skill Levels:')}`);
   for (const skill of skillTypes) {
     const label = skill.charAt(0).toUpperCase() + skill.slice(1);
-    lines.push(`    ${label}: ${stats.highestSkillLevels[skill]}`);
+    lines.push(`    ${THEME.screens.gameOverLabel(label + ':')} ${chalk.white(stats.highestSkillLevels[skill])}`);
   }
   lines.push('');
-  lines.push(`  Seed: ${seed}`);
+  lines.push(`  ${THEME.screens.gameOverLabel('Seed:')} ${chalk.gray(seed)}`);
   lines.push('');
 
   return lines.join('\n');
 }
-
-// ─── renderPerkSelection ────────────────────────────────────────────────────
 
 export function renderPerkSelection(perks: Perk[]): string {
   const lines: string[] = [];
 
   lines.push('');
-  lines.push('  Choose a Perk:');
+  lines.push(`  ${chalk.bold('Choose a Perk:')}`);
   lines.push('');
   for (let i = 0; i < perks.length; i++) {
-    lines.push(`  ${i + 1}. ${perks[i].name} — ${perks[i].description}`);
+    lines.push(`  ${chalk.white(`${i + 1}.`)} ${THEME.screens.perkName(perks[i].name)} ${chalk.gray('—')} ${THEME.screens.perkDesc(perks[i].description)}`);
   }
   lines.push('');
 
   return lines.join('\n');
 }
 
-// ─── renderHelp ──────────────────────────────────────────────────────────────
-
 export function renderHelp(): string {
   const lines: string[] = [];
 
   lines.push('');
-  lines.push('  Available Commands:');
+  lines.push(`  ${chalk.bold.cyan('Available Commands:')}`);
   lines.push('');
   lines.push('  north/south/east/west (n/s/e/w) - Move in a direction');
   lines.push('  attack                          - Attack an adjacent enemy');
@@ -201,11 +231,9 @@ export function renderHelp(): string {
   return lines.join('\n');
 }
 
-// ─── checkTerminalSize ───────────────────────────────────────────────────────
-
 export function checkTerminalSize(cols: number, rows: number): string | null {
   if (cols < 80 || rows < 24) {
-    return `Terminal too small (${cols}x${rows}). Please resize to at least 80x24.`;
+    return chalk.yellow(`Terminal too small (${cols}x${rows}). Please resize to at least 80x24.`);
   }
   return null;
 }

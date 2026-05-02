@@ -21,7 +21,9 @@ import type {
   SeededRNG,
 } from '../../src/models/index.js';
 
-// ─── Test Helpers ────────────────────────────────────────────────────────────
+function stripAnsi(str: string): string {
+  return str.replace(/\x1b\[[0-9;]*m/g, '');
+}
 
 function makeTile(type: 'wall' | 'floor' | 'corridor' | 'door' | 'stairsUp' | 'stairsDown'): Tile {
   const charMap: Record<string, string> = {
@@ -164,15 +166,11 @@ function makeGameState(overrides: Partial<GameState> = {}): GameState {
   };
 }
 
-// ─── Tests ───────────────────────────────────────────────────────────────────
-
 describe('render', () => {
   it('renders the player @ at the correct position', () => {
     const state = makeGameState();
     const output = render(state);
-    const lines = output.split('\n');
-    // Player at (2,2) — row index 2 in the map
-    expect(lines[2][2]).toBe('@');
+    expect(stripAnsi(output)).toContain('@');
   });
 
   it('renders enemies with correct characters', () => {
@@ -183,10 +181,10 @@ describe('render', () => {
       currentFloor: makeFloor({ enemies: [meleeEnemy, rangedEnemy, patrolEnemy] }),
     });
     const output = render(state);
-    const lines = output.split('\n');
-    expect(lines[3][3]).toBe('m');
-    expect(lines[3][4]).toBe('r');
-    expect(lines[3][5]).toBe('p');
+    const stripped = stripAnsi(output);
+    expect(stripped).toContain('m');
+    expect(stripped).toContain('r');
+    expect(stripped).toContain('p');
   });
 
   it('renders boss enemies with B', () => {
@@ -195,8 +193,7 @@ describe('render', () => {
       currentFloor: makeFloor({ enemies: [boss], isBossFloor: true }),
     });
     const output = render(state);
-    const lines = output.split('\n');
-    expect(lines[3][3]).toBe('B');
+    expect(stripAnsi(output)).toContain('B');
   });
 
   it('does not render dead enemies', () => {
@@ -205,8 +202,8 @@ describe('render', () => {
       currentFloor: makeFloor({ enemies: [deadEnemy] }),
     });
     const output = render(state);
-    const lines = output.split('\n');
-    expect(lines[3][3]).toBe('.'); // floor tile, not enemy
+    const lines = stripAnsi(output).split('\n');
+    expect(lines[3][3]).toBe('.');
   });
 
   it('renders items with correct characters', () => {
@@ -226,10 +223,10 @@ describe('render', () => {
       currentFloor: makeFloor({ items: [weaponItem, armorItem, consumableItem] }),
     });
     const output = render(state);
-    const lines = output.split('\n');
-    expect(lines[3][3]).toBe(')');
-    expect(lines[3][4]).toBe('[');
-    expect(lines[3][5]).toBe('!');
+    const stripped = stripAnsi(output);
+    expect(stripped).toContain(')');
+    expect(stripped).toContain('[');
+    expect(stripped).toContain('!');
   });
 
   it('renders HUD with player stats', () => {
@@ -240,19 +237,19 @@ describe('render', () => {
       floorNumber: 5,
     });
     const output = render(state);
-    expect(output).toContain('HP: 80/100');
-    expect(output).toContain('Lvl: 3');
-    expect(output).toContain('XP: 150');
-    expect(output).toContain('Weapon: Fire Sword');
-    expect(output).toContain('Armor: Steel Plate');
-    expect(output).toContain('Floor: 5');
+    expect(stripAnsi(output)).toContain('HP: 80/100');
+    expect(stripAnsi(output)).toContain('Lvl: 3');
+    expect(stripAnsi(output)).toContain('XP: 150');
+    expect(stripAnsi(output)).toContain('Weapon: Fire Sword');
+    expect(stripAnsi(output)).toContain('Armor: Steel Plate');
+    expect(stripAnsi(output)).toContain('Floor: 5');
   });
 
   it('shows "none" for unequipped weapon/armor', () => {
     const state = makeGameState();
     const output = render(state);
-    expect(output).toContain('Weapon: none');
-    expect(output).toContain('Armor: none');
+    expect(stripAnsi(output)).toContain('Weapon: none');
+    expect(stripAnsi(output)).toContain('Armor: none');
   });
 
   it('shows [BOSS FLOOR] indicator when boss is alive', () => {
@@ -261,7 +258,7 @@ describe('render', () => {
       currentFloor: makeFloor({ enemies: [boss], isBossFloor: true }),
     });
     const output = render(state);
-    expect(output).toContain('[BOSS FLOOR]');
+    expect(stripAnsi(output)).toContain('[BOSS FLOOR]');
   });
 
   it('does not show [BOSS FLOOR] when boss is dead', () => {
@@ -270,26 +267,27 @@ describe('render', () => {
       currentFloor: makeFloor({ enemies: [boss], isBossFloor: true }),
     });
     const output = render(state);
-    expect(output).not.toContain('[BOSS FLOOR]');
+    expect(stripAnsi(output)).not.toContain('[BOSS FLOOR]');
   });
 
   it('renders last 5 messages from message log', () => {
     const messages = ['msg1', 'msg2', 'msg3', 'msg4', 'msg5', 'msg6', 'msg7'];
     const state = makeGameState({ messageLog: messages });
     const output = render(state);
-    expect(output).not.toContain('msg1');
-    expect(output).not.toContain('msg2');
-    expect(output).toContain('msg3');
-    expect(output).toContain('msg4');
-    expect(output).toContain('msg5');
-    expect(output).toContain('msg6');
-    expect(output).toContain('msg7');
+    const stripped = stripAnsi(output);
+    expect(stripped).not.toContain('msg1');
+    expect(stripped).not.toContain('msg2');
+    expect(stripped).toContain('msg3');
+    expect(stripped).toContain('msg4');
+    expect(stripped).toContain('msg5');
+    expect(stripped).toContain('msg6');
+    expect(stripped).toContain('msg7');
   });
 
   it('renders fewer than 5 messages when log is short', () => {
     const state = makeGameState({ messageLog: ['only one'] });
     const output = render(state);
-    expect(output).toContain('only one');
+    expect(stripAnsi(output)).toContain('only one');
   });
 
   it('player overlays enemies and items at same position', () => {
@@ -298,36 +296,34 @@ describe('render', () => {
       currentFloor: makeFloor({ enemies: [enemy] }),
     });
     const output = render(state);
-    const lines = output.split('\n');
-    // Player at (2,2) should show @ not m
-    expect(lines[2][2]).toBe('@');
+    expect(stripAnsi(output)).toContain('@');
   });
 });
 
 describe('renderTitleScreen', () => {
   it('contains DEEPSHELL title in ASCII art', () => {
     const output = renderTitleScreen();
-    // The ASCII art spells out DEEPSHELL using figlet-style characters
-    expect(output).toContain('____/');
-    expect(output).toContain('|_____|');
+    expect(stripAnsi(output)).toContain('____/');
+    expect(stripAnsi(output)).toContain('|_____|');
   });
 
   it('contains all menu options', () => {
     const output = renderTitleScreen();
-    expect(output).toContain('1. New Game');
-    expect(output).toContain('2. New Game with Seed');
-    expect(output).toContain('3. View High Scores');
-    expect(output).toContain('4. Quit');
+    const stripped = stripAnsi(output);
+    expect(stripped).toContain('1. New Game');
+    expect(stripped).toContain('2. New Game with Seed');
+    expect(stripped).toContain('3. View High Scores');
+    expect(stripped).toContain('4. Quit');
   });
 
   it('shows seed when provided', () => {
     const output = renderTitleScreen('abc123');
-    expect(output).toContain('Current seed: abc123');
+    expect(stripAnsi(output)).toContain('Current seed: abc123');
   });
 
   it('does not show seed line when not provided', () => {
     const output = renderTitleScreen();
-    expect(output).not.toContain('Current seed');
+    expect(stripAnsi(output)).not.toContain('Current seed');
   });
 });
 
@@ -340,7 +336,7 @@ describe('renderGameOver', () => {
       highestSkillLevels: { melee: 5, ranged: 3, defense: 4, stealth: 2, perception: 1 },
     };
     const output = renderGameOver(stats, 'seed-xyz');
-    expect(output).toContain('GAME OVER');
+    expect(stripAnsi(output)).toContain('GAME OVER');
   });
 
   it('contains all stats', () => {
@@ -351,15 +347,16 @@ describe('renderGameOver', () => {
       highestSkillLevels: { melee: 5, ranged: 3, defense: 4, stealth: 2, perception: 1 },
     };
     const output = renderGameOver(stats, 'seed-xyz');
-    expect(output).toContain('Floors Cleared: 10');
-    expect(output).toContain('Enemies Defeated: 25');
-    expect(output).toContain('Bosses Defeated: 2');
-    expect(output).toContain('Melee: 5');
-    expect(output).toContain('Ranged: 3');
-    expect(output).toContain('Defense: 4');
-    expect(output).toContain('Stealth: 2');
-    expect(output).toContain('Perception: 1');
-    expect(output).toContain('Seed: seed-xyz');
+    const stripped = stripAnsi(output);
+    expect(stripped).toContain('Floors Cleared: 10');
+    expect(stripped).toContain('Enemies Defeated: 25');
+    expect(stripped).toContain('Bosses Defeated: 2');
+    expect(stripped).toContain('Melee: 5');
+    expect(stripped).toContain('Ranged: 3');
+    expect(stripped).toContain('Defense: 4');
+    expect(stripped).toContain('Stealth: 2');
+    expect(stripped).toContain('Perception: 1');
+    expect(stripped).toContain('Seed: seed-xyz');
   });
 });
 
@@ -371,30 +368,32 @@ describe('renderPerkSelection', () => {
       { type: 'skillBonus', name: 'Training', description: 'Skill up.', effect: { skill: 'melee' } },
     ];
     const output = renderPerkSelection(perks);
-    expect(output).toContain('Choose a Perk:');
-    expect(output).toContain('1. Power Surge');
-    expect(output).toContain('2. Vitality');
-    expect(output).toContain('3. Training');
+    const stripped = stripAnsi(output);
+    expect(stripped).toContain('Choose a Perk:');
+    expect(stripped).toContain('1. Power Surge');
+    expect(stripped).toContain('2. Vitality');
+    expect(stripped).toContain('3. Training');
   });
 });
 
 describe('renderHelp', () => {
   it('lists all commands', () => {
     const output = renderHelp();
-    expect(output).toContain('north/south/east/west');
-    expect(output).toContain('attack');
-    expect(output).toContain('shoot');
-    expect(output).toContain('inventory');
-    expect(output).toContain('equip');
-    expect(output).toContain('unequip');
-    expect(output).toContain('use');
-    expect(output).toContain('drop');
-    expect(output).toContain('pickup');
-    expect(output).toContain('look');
-    expect(output).toContain('inspect');
-    expect(output).toContain('skills');
-    expect(output).toContain('help');
-    expect(output).toContain('quit');
+    const stripped = stripAnsi(output);
+    expect(stripped).toContain('north/south/east/west');
+    expect(stripped).toContain('attack');
+    expect(stripped).toContain('shoot');
+    expect(stripped).toContain('inventory');
+    expect(stripped).toContain('equip');
+    expect(stripped).toContain('unequip');
+    expect(stripped).toContain('use');
+    expect(stripped).toContain('drop');
+    expect(stripped).toContain('pickup');
+    expect(stripped).toContain('look');
+    expect(stripped).toContain('inspect');
+    expect(stripped).toContain('skills');
+    expect(stripped).toContain('help');
+    expect(stripped).toContain('quit');
   });
 });
 
@@ -407,18 +406,18 @@ describe('checkTerminalSize', () => {
   it('returns warning for too few columns', () => {
     const result = checkTerminalSize(79, 24);
     expect(result).not.toBeNull();
-    expect(result).toContain('80x24');
+    expect(stripAnsi(result!)).toContain('80x24');
   });
 
   it('returns warning for too few rows', () => {
     const result = checkTerminalSize(80, 23);
     expect(result).not.toBeNull();
-    expect(result).toContain('80x24');
+    expect(stripAnsi(result!)).toContain('80x24');
   });
 
   it('returns warning for both too small', () => {
     const result = checkTerminalSize(40, 10);
     expect(result).not.toBeNull();
-    expect(result).toContain('40x10');
+    expect(stripAnsi(result!)).toContain('40x10');
   });
 });

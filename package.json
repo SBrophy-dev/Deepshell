@@ -10,12 +10,20 @@
     "test": "vitest run",
     "test:watch": "vitest"
   },
-  "keywords": ["roguelike", "cli", "dungeon-crawler", "ascii"],
+  "keywords": [
+    "roguelike",
+    "cli",
+    "dungeon-crawler",
+    "ascii"
+  ],
   "license": "MIT",
   "devDependencies": {
-    "typescript": "^5.7.0",
-    "vitest": "^3.2.1",
+    "@types/node": "^22.15.0",
     "fast-check": "^4.1.1",
-    "@types/node": "^22.15.0"
+    "typescript": "^5.7.0",
+    "vitest": "^3.2.1"
+  },
+  "dependencies": {
+    "chalk": "^5.6.2"
   }
 }
