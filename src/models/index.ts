@@ -191,6 +191,7 @@ export interface GameState {
   currentFloor: Floor;
   floorNumber: number;
   messageLog: string[];
+  messageScrollOffset: number;
   gamePhase: 'title' | 'playing' | 'perkSelection' | 'gameOver';
   runStats: RunStats;
   perkChoices?: Perk[];
@@ -211,6 +212,7 @@ export interface ParsedCommand {
   action: string;
   target: string | null;
   raw: string;
+  count?: number;
 }
 
 export interface CommandError {

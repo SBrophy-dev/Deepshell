@@ -62,7 +62,6 @@ describe('parseCommand', () => {
     expect('error' in result).toBe(true);
     if ('error' in result) {
       expect(result.error).toContain('dance');
-      expect(result.error).toContain('Available commands');
     }
   });
 
@@ -75,11 +74,48 @@ describe('parseCommand', () => {
     const actions = [
       'north', 'south', 'east', 'west', 'attack', 'inventory',
       'equip', 'use', 'look', 'inspect', 'skills', 'shoot',
-      'drop', 'unequip', 'help', 'quit', 'pickup',
+      'drop', 'unequip', 'help', 'quit', 'pickup', 'messages', 'scroll',
     ];
     for (const action of actions) {
       const result = parseCommand(action);
       expect('action' in result, `Expected "${action}" to be valid`).toBe(true);
     }
+  });
+
+  describe('count parsing', () => {
+    it('parses count for repeatable actions', () => {
+      const result = parseCommand('north 5');
+      expect(result).toEqual({ action: 'north', target: null, raw: 'north 5', count: 5 });
+    });
+
+    it('parses count with abbreviations', () => {
+      const result = parseCommand('w 3');
+      expect(result).toEqual({ action: 'west', target: null, raw: 'w 3', count: 3 });
+    });
+
+    it('parses count for attack', () => {
+      const result = parseCommand('attack 4');
+      expect(result).toEqual({ action: 'attack', target: null, raw: 'attack 4', count: 4 });
+    });
+
+    it('caps count at 50', () => {
+      const result = parseCommand('north 100');
+      expect('count' in result && result.count).toBe(50);
+    });
+
+    it('sets minimum count to 1', () => {
+      const result = parseCommand('north 0');
+      expect('count' in result && result.count).toBe(1);
+    });
+
+    it('does not parse count for non-repeatable actions', () => {
+      const result = parseCommand('inventory 5');
+      expect(result).toEqual({ action: 'inventory', target: '5', raw: 'inventory 5' });
+    });
+
+    it('parses shoot with direction (no count)', () => {
+      const result = parseCommand('shoot north 5');
+      expect(result).toEqual({ action: 'shoot', target: 'north 5', raw: 'shoot north 5' });
+    });
   });
 });

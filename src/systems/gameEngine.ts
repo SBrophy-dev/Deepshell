@@ -25,6 +25,7 @@ import { generateTreasureChestLoot } from './lootSystem.js';
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const MAX_MESSAGE_LOG = 50;
+const VISIBLE_MESSAGE_LINES = 10;
 
 const DIRECTION_DELTAS: Record<Direction, Position> = {
   north: { x: 0, y: -1 },
@@ -35,8 +36,8 @@ const DIRECTION_DELTAS: Record<Direction, Position> = {
 
 const HELP_TEXT = [
   'Available commands:',
-  '  north/south/east/west (n/s/e/w) - Move in a direction',
-  '  attack - Attack an adjacent enemy',
+  '  north/south/east/west (n/s/e/w) [count] - Move in a direction',
+  '  attack [count] - Attack an adjacent enemy',
   '  shoot [direction] - Fire ranged weapon in a direction',
   '  inventory - List your items',
   '  equip [item] - Equip a weapon or armor',
@@ -47,6 +48,8 @@ const HELP_TEXT = [
   '  look - Describe your surroundings',
   '  inspect [target] - Inspect an enemy or item',
   '  skills - Show your skill levels',
+  '  messages - Show full message history',
+  '  scroll [up|down|top|bottom] - Scroll message log',
   '  help - Show this help message',
   '  quit - End the game',
 ];
@@ -125,6 +128,7 @@ export function initNewGame(seed?: string): GameState {
     currentFloor: floor,
     floorNumber: 1,
     messageLog: ['Welcome to Deepshell! Type "help" for a list of commands.'],
+    messageScrollOffset: 0,
     gamePhase: 'playing',
     runStats: {
       floorsCleared: 0,
@@ -693,6 +697,40 @@ function handleQuit(state: GameState): GameState {
   return newState;
 }
 
+// ─── Messages Handler ────────────────────────────────────────────────────────
+
+function handleMessages(state: GameState): GameState {
+  const fullLog = state.messageLog;
+  if (fullLog.length === 0) {
+    return addMessages(state, 'No messages to display.');
+  }
+  const lines = ['=== Message History ===', ...fullLog, '======================='];
+  return addMessages(state, ...lines);
+}
+
+// ─── Scroll Handler ──────────────────────────────────────────────────────────
+
+function handleScroll(state: GameState, direction: string | null): GameState {
+  const totalMessages = state.messageLog.length;
+  const maxOffset = Math.max(0, totalMessages - VISIBLE_MESSAGE_LINES);
+
+  let newOffset = state.messageScrollOffset;
+
+  if (direction === 'up' || direction === 'u') {
+    newOffset = Math.min(maxOffset, newOffset + VISIBLE_MESSAGE_LINES);
+  } else if (direction === 'down' || direction === 'd') {
+    newOffset = Math.max(0, newOffset - VISIBLE_MESSAGE_LINES);
+  } else if (direction === 'top' || direction === 't') {
+    newOffset = maxOffset;
+  } else if (direction === 'bottom' || direction === 'b') {
+    newOffset = 0;
+  } else {
+    return addMessages(state, 'Usage: scroll [up|down|top|bottom] (or u/d/t/b)');
+  }
+
+  return { ...state, messageScrollOffset: newOffset };
+}
+
 // ─── Perk Selection Handler ──────────────────────────────────────────────────
 
 function handlePerkSelection(state: GameState, command: ParsedCommand): GameState {
@@ -928,6 +966,14 @@ export function processCommand(state: GameState, command: ParsedCommand): GameSt
 
     case 'quit':
       newState = handleQuit(state);
+      break;
+
+    case 'messages':
+      newState = handleMessages(state);
+      break;
+
+    case 'scroll':
+      newState = handleScroll(state, command.target);
       break;
 
     default:

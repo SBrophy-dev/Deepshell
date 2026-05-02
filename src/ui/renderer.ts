@@ -54,7 +54,7 @@ function tileChar(type: string, char: string): string {
 }
 
 export function render(state: GameState): string {
-  const { currentFloor, player, messageLog, floorNumber } = state;
+  const { currentFloor, player, messageLog, messageScrollOffset, floorNumber } = state;
   const lines: string[] = [];
 
   const mapLines = renderMap(currentFloor, player.position, currentFloor.enemies, currentFloor.items);
@@ -82,9 +82,25 @@ export function render(state: GameState): string {
 
   lines.push('');
 
-  const recentMessages = messageLog.slice(-5);
-  for (const msg of recentMessages) {
+  const visibleLines = 10;
+  const totalMessages = messageLog.length;
+  const maxOffset = Math.max(0, totalMessages - visibleLines);
+  const effectiveOffset = Math.min(messageScrollOffset, maxOffset);
+  
+  const startIndex = Math.max(0, totalMessages - visibleLines - effectiveOffset);
+  const endIndex = totalMessages - effectiveOffset;
+  const displayedMessages = messageLog.slice(startIndex, endIndex);
+  
+  for (const msg of displayedMessages) {
     lines.push(colorizeMessage(msg));
+  }
+
+  if (effectiveOffset < maxOffset) {
+    const hidden = maxOffset - effectiveOffset;
+    lines.push(chalk.dim(`  ↑ ${hidden} older message${hidden > 1 ? 's' : ''}`));
+  }
+  if (effectiveOffset > 0) {
+    lines.push(chalk.dim(`  ↓ ${effectiveOffset} newer message${effectiveOffset > 1 ? 's' : ''}`));
   }
 
   return lines.join('\n');
@@ -212,20 +228,22 @@ export function renderHelp(): string {
   lines.push('');
   lines.push(`  ${chalk.bold.cyan('Available Commands:')}`);
   lines.push('');
-  lines.push('  north/south/east/west (n/s/e/w) - Move in a direction');
-  lines.push('  attack                          - Attack an adjacent enemy');
-  lines.push('  shoot [direction]               - Fire ranged weapon in a direction');
-  lines.push('  inventory                       - List your items');
-  lines.push('  equip [item]                    - Equip a weapon or armor');
-  lines.push('  unequip [weapon/armor]          - Unequip from a slot');
-  lines.push('  use [item]                      - Use a consumable item');
-  lines.push('  drop [item]                     - Drop an item on the floor');
-  lines.push('  pickup                          - Pick up an item at your position');
-  lines.push('  look                            - Describe your surroundings');
-  lines.push('  inspect [target]                - Inspect an enemy or item');
-  lines.push('  skills                          - Show your skill levels');
-  lines.push('  help                            - Show this help message');
-  lines.push('  quit                            - End the game');
+  lines.push('  north/south/east/west (n/s/e/w) [count] - Move');
+  lines.push('  attack [count]                          - Attack adjacent enemy');
+  lines.push('  shoot [direction]                       - Fire ranged weapon');
+  lines.push('  inventory                               - List your items');
+  lines.push('  equip [item]                            - Equip weapon/armor');
+  lines.push('  unequip [weapon/armor]                  - Unequip from slot');
+  lines.push('  use [item]                              - Use consumable');
+  lines.push('  drop [item]                             - Drop item');
+  lines.push('  pickup                                  - Pick up item');
+  lines.push('  look                                    - Describe surroundings');
+  lines.push('  inspect [target]                        - Inspect enemy/item');
+  lines.push('  skills                                  - Show skill levels');
+  lines.push('  messages                                - Show full message log');
+  lines.push('  scroll [up|down|top|bottom]             - Scroll messages');
+  lines.push('  help                                    - Show this message');
+  lines.push('  quit                                    - End the game');
   lines.push('');
 
   return lines.join('\n');

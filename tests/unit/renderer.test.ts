@@ -155,6 +155,7 @@ function makeGameState(overrides: Partial<GameState> = {}): GameState {
     currentFloor: makeFloor(),
     floorNumber: 1,
     messageLog: ['Welcome!'],
+    messageScrollOffset: 0,
     gamePhase: 'playing',
     runStats: {
       floorsCleared: 0,
@@ -270,21 +271,26 @@ describe('render', () => {
     expect(stripAnsi(output)).not.toContain('[BOSS FLOOR]');
   });
 
-  it('renders last 5 messages from message log', () => {
-    const messages = ['msg1', 'msg2', 'msg3', 'msg4', 'msg5', 'msg6', 'msg7'];
+  it('renders last 10 messages from message log', () => {
+    const messages = ['msg01', 'msg02', 'msg03', 'msg04', 'msg05', 'msg06', 'msg07', 'msg08', 'msg09', 'msg10', 'msg11', 'msg12'];
     const state = makeGameState({ messageLog: messages });
     const output = render(state);
     const stripped = stripAnsi(output);
-    expect(stripped).not.toContain('msg1');
-    expect(stripped).not.toContain('msg2');
-    expect(stripped).toContain('msg3');
-    expect(stripped).toContain('msg4');
-    expect(stripped).toContain('msg5');
-    expect(stripped).toContain('msg6');
-    expect(stripped).toContain('msg7');
+    expect(stripped).not.toContain('msg01');
+    expect(stripped).not.toContain('msg02');
+    expect(stripped).toContain('msg03');
+    expect(stripped).toContain('msg04');
+    expect(stripped).toContain('msg05');
+    expect(stripped).toContain('msg06');
+    expect(stripped).toContain('msg07');
+    expect(stripped).toContain('msg08');
+    expect(stripped).toContain('msg09');
+    expect(stripped).toContain('msg10');
+    expect(stripped).toContain('msg11');
+    expect(stripped).toContain('msg12');
   });
 
-  it('renders fewer than 5 messages when log is short', () => {
+  it('renders fewer than 10 messages when log is short', () => {
     const state = makeGameState({ messageLog: ['only one'] });
     const output = render(state);
     expect(stripAnsi(output)).toContain('only one');

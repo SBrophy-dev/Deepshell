@@ -4,8 +4,8 @@ import type { GameState, ParsedCommand, Direction, Weapon, Consumable, Enemy } f
 
 // ─── Helper ──────────────────────────────────────────────────────────────────
 
-function cmd(action: string, target: string | null = null): ParsedCommand {
-  return { action, target, raw: target ? `${action} ${target}` : action };
+function cmd(action: string, target: string | null = null, count?: number): ParsedCommand {
+  return { action, target, raw: target ? `${action} ${target}` : action, count };
 }
 
 // ─── initNewGame ─────────────────────────────────────────────────────────────

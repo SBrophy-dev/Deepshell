@@ -104,11 +104,23 @@ async function runGameLoop(initialState: GameState): Promise<void> {
       state = {
         ...state,
         messageLog: [...state.messageLog, parsed.error].slice(-50),
+        messageScrollOffset: 0,
       };
       continue;
     }
 
-    state = processCommand(state, parsed);
+    const scrollCommand = parsed.action === 'scroll';
+    const prevLogLength = state.messageLog.length;
+
+    const repeatCount = parsed.count ?? 1;
+    for (let i = 0; i < repeatCount; i++) {
+      state = processCommand(state, parsed);
+      if (state.gamePhase !== 'playing') break;
+    }
+
+    if (!scrollCommand && state.messageLog.length > prevLogLength) {
+      state = { ...state, messageScrollOffset: 0 };
+    }
 
     if (state.gamePhase === 'gameOver') {
       clearScreen();
