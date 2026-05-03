@@ -128,7 +128,7 @@ Choose a perk:
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/deepshell.git
+git clone https://github.com/SBrophy-dev/deepshell.git
 cd deepshell
 
 # Install dependencies
