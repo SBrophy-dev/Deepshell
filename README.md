@@ -1,128 +1,48 @@
-# Deepshell
+# DeepShell
 
-A CLI roguelike dungeon crawler built in TypeScript. Explore procedurally generated dungeons, battle enemies, collect loot, and see how deep you can go.
+A polished CLI roguelike dungeon crawler built in TypeScript. Explore procedurally generated dungeons, battle enemies, collect loot, and see how deep you can go — all from the comfort of your terminal.
+
+![Title Screen](src/screenshots/Deepshell_homepage.png)
 
 ## Features
 
 - **Procedural Dungeon Generation**: Every floor is uniquely generated with rooms, corridors, and secrets
 - **Turn-Based Combat**: Strategic melee and ranged combat with skill progression
-- **Skill System**: Level up 5 different skills - Melee, Ranged, Defense, Stealth, and Perception
+- **Skill System**: Level up 5 different skills — Melee, Ranged, Defense, Stealth, and Perception
 - **Perk System**: Choose powerful perks after clearing each floor
 - **Boss Battles**: Face challenging bosses every 5 floors
 - **Seeded Runs**: Share seeds with friends for the same dungeon layout
 - **High Scores**: Track your best runs
 
+## UI Features
+
+- **Responsive Panel Layout**: Wide terminals show the map, status, and messages side-by-side; narrow terminals fall back to a clean stacked view
+- **Visual Status Bars**: HP and XP bars with dynamic color shifts (green → yellow → red)
+- **Box-Drawn Panels**: Unicode border frames surround every screen element for a crisp, organized look
+- **Contextual Message Icons**: Combat, loot, level-ups, movement, and warnings each get their own icon and color
+- **Help Overlay**: `help` opens a clean command reference overlay without cluttering your message log
+- **Built-in Tutorial**: New players can jump straight into a guided tutorial from the title screen
+- **Cinematic Boot Sequence**: A typewriter-style intro welcomes you into the DeepShell
+
 ## Screenshots
 
-### Title Screen
-```
-  ____  _____ _____ ____  ____  _   _ _____ _     _     
- |  _ \| ____| ____|  _ \/ ___|| | | | ____| |   | |    
- | | | |  _| |  _| | |_) \___ \| |_| |  _| | |   | |    
- | |_| | |___| |___|  __/ ___) |  _  | |___| |___| |___ 
- |____/|_____|_____|_|   |____/|_| |_|_____|_____|_____|
+### Title Screen & Tutorial
 
-  1. New Game
-  2. New Game with Seed
-  3. View High Scores
-  4. Quit
-```
+| Title Screen | How to Play |
+|:------------:|:-----------:|
+| ![Title](src/screenshots/Deepshell_homepage.png) | ![Tutorial](src/screenshots/Deepshell_HowToPlay.png) |
 
-### Dungeon Exploration
-```
-####################################################
-####################################################
-##############################################....##
-##############################################.<..##
-####.......#########################........##.@..##
-####....m..#########################........##....##
-####...!..+m........................+......+..+...##
-####.......########+++++++##########........##....##
-####...+...########.......##########........##....##
-#######.###########.......##########+++++...########
-#######.####.......+.....+...............###########
-#######.#...++++###.......#############..###########
-#######.#.......###.......#############..###########
-#######.#.......#######################..###########
-#######.#......+...............########..###########
-#######.#.......##############.########..###########
-#######.#.......##############.########..###########
-#######.#.......##############.########..###########
-#######.######################.########..###########
-#######.######################.########..###########
-#######.######################.#####...++.##########
-#######.###################...+..###......##########
-#######....................+.).r+...+.....##########
-###########################...!>.###......##########
-###########################...r..###################
-####################################################
-####################################################
-####################################################
+### Dungeon Exploration & Combat
 
-HP: 100/100  Lvl: 1  XP: 0  Weapon: Rusty Dagger  Armor: none  Floor: 1
-```
+| Floor 1 — Exploration | Combat Messages |
+|:---------------------:|:---------------:|
+| ![Floor 1](src/screenshots/Deepshell_lvl1.png) | ![Combat](src/screenshots/Deepshell_Attack.png) |
 
-### Boss Floor
-```
-#######################################################
-#######################################################
-#############.........#################################
-#############.........#################################
-#############.........#################################
-####.........+.......+................#################
-####.########.........#############.#.#################
-####.########.........#############.#.#################
-####.##############################.#.#################
-####.##############################.#.########......###
-####.##############################.#.########......###
-####.##############################.#.########......###
-####.############################..+.+...#####......###
-####.#####........###############........#####...+..###
-####.#####........###############........########.#####
-####.#####.......+...............+......+.........#####
-####.#####........###############........########.#####
-##..+..###....+...###############........########.#####
-##.....#######.##################..+.....########.#####
-##..)..#######.####################.#############.#####
-##..+..#######.####################.#############.#####
-####.#########.####################.#############.#####
-####.#########.#.....##########....+....#########.#####
-####.#########.#...!.##########.@.......########.+....#
-####.#########.#..)..##########.........########......#
-####............+.B.+..........+.......+........+.....#
-################...>.##########.........########......#
-################.....##########.........###############
-#######################################################
+### Items & Progression
 
-HP: 85/100  Lvl: 3  XP: 150  Weapon: Floor 3 Sword  Armor: Floor 2 Shield  Floor: 5  [BOSS FLOOR]
-```
-
-### Perk Selection
-```
-Floor 4 completed!
-Choose a perk:
-  1. Ranged Training — Increase your Ranged skill level by 1.
-  2. Power Surge — Increase your base damage by 4.
-  3. Found: Perk Shield — Receive a Perk Shield.
-```
-
-### Game Over Screen
-```
-  === GAME OVER ===
-
-  Floors Cleared: 7
-  Enemies Defeated: 42
-  Bosses Defeated: 1
-
-  Highest Skill Levels:
-    Melee: 4
-    Ranged: 2
-    Defense: 3
-    Stealth: 2
-    Perception: 3
-
-  Seed: 1714396800000
-```
+| Inventory & Pickups | Perk Selection |
+|:--------------------:|:--------------:|
+| ![Inventory](src/screenshots/Deepshell_InventoryPickup.png) | ![Perks](src/screenshots/Deepshell_NextLevelPerk.png) |
 
 ## Installation
 
@@ -163,7 +83,7 @@ npm start
 | `look` | `l` | Describe surroundings |
 | `inspect [target]` | | Inspect enemy or item |
 | `skills` | | Show skill levels |
-| `help` | `?` | Show help message |
+| `help` | `?` | Show help overlay |
 | `quit` | `q` | End the game |
 
 ## ASCII Legend
@@ -196,9 +116,10 @@ npm run test:watch
 
 ## Tech Stack
 
-- **TypeScript** - Type-safe JavaScript
-- **Node.js** - Runtime environment
-- **Vitest** - Testing framework with property-based testing support
+- **TypeScript** — Type-safe JavaScript
+- **Node.js** — Runtime environment
+- **Chalk** — Terminal styling and colors
+- **Vitest** — Testing framework with property-based testing support
 
 ## License
 

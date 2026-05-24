@@ -5,6 +5,7 @@ import {
   renderGameOver,
   renderPerkSelection,
   renderHelp,
+  renderTutorial,
   checkTerminalSize,
 } from '../../src/ui/renderer.js';
 import type {
@@ -110,7 +111,7 @@ function makePlayer(overrides: Partial<Player> = {}): Player {
   return {
     id: 'player',
     name: 'Player',
-    position: { x: 2, y: 2 },
+    position: { x: 25, y: 25 },
     health: 80,
     maxHealth: 100,
     damage: 5,
@@ -134,12 +135,12 @@ function makePlayer(overrides: Partial<Player> = {}): Player {
 
 function makeFloor(overrides: Partial<Floor> = {}): Floor {
   return {
-    width: 7,
-    height: 7,
-    grid: makeGrid(7, 7),
-    rooms: [{ x: 1, y: 1, width: 5, height: 5 }],
+    width: 50,
+    height: 50,
+    grid: makeGrid(50, 50),
+    rooms: [{ x: 1, y: 1, width: 48, height: 48 }],
     entry: { x: 1, y: 1 },
-    exit: { x: 5, y: 5 },
+    exit: { x: 48, y: 48 },
     enemies: [],
     items: [],
     isBossFloor: false,
@@ -203,8 +204,10 @@ describe('render', () => {
       currentFloor: makeFloor({ enemies: [deadEnemy] }),
     });
     const output = render(state);
-    const lines = stripAnsi(output).split('\n');
-    expect(lines[3][3]).toBe('.');
+    const stripped = stripAnsi(output);
+    // Map row 3 inside the box should not have 'm' at the enemy position
+    expect(stripped).not.toContain('│#..m');
+    expect(stripped).toContain('│#...');
   });
 
   it('renders items with correct characters', () => {
@@ -238,19 +241,22 @@ describe('render', () => {
       floorNumber: 5,
     });
     const output = render(state);
-    expect(stripAnsi(output)).toContain('HP: 80/100');
-    expect(stripAnsi(output)).toContain('Lvl: 3');
-    expect(stripAnsi(output)).toContain('XP: 150');
-    expect(stripAnsi(output)).toContain('Weapon: Fire Sword');
-    expect(stripAnsi(output)).toContain('Armor: Steel Plate');
-    expect(stripAnsi(output)).toContain('Floor: 5');
+    const stripped = stripAnsi(output);
+    expect(stripped).toContain('HP [');
+    expect(stripped).toContain('80/100');
+    expect(stripped).toContain('XP [');
+    expect(stripped).toContain('150');
+    expect(stripped).toContain('Wpn: Fire Sword');
+    expect(stripped).toContain('Arm: Steel Plate');
+    expect(stripped).toContain('Lvl: 3');
+    expect(stripped).toContain(' Floor 5 ');
   });
 
   it('shows "none" for unequipped weapon/armor', () => {
     const state = makeGameState();
     const output = render(state);
-    expect(stripAnsi(output)).toContain('Weapon: none');
-    expect(stripAnsi(output)).toContain('Armor: none');
+    expect(stripAnsi(output)).toContain('Wpn: none');
+    expect(stripAnsi(output)).toContain('Arm: none');
   });
 
   it('shows [BOSS FLOOR] indicator when boss is alive', () => {
@@ -271,15 +277,16 @@ describe('render', () => {
     expect(stripAnsi(output)).not.toContain('[BOSS FLOOR]');
   });
 
-  it('renders last 10 messages from message log', () => {
+  it('renders last messages from message log', () => {
     const messages = ['msg01', 'msg02', 'msg03', 'msg04', 'msg05', 'msg06', 'msg07', 'msg08', 'msg09', 'msg10', 'msg11', 'msg12'];
     const state = makeGameState({ messageLog: messages });
     const output = render(state);
     const stripped = stripAnsi(output);
+    // With 8 visible lines, last 8 are shown
     expect(stripped).not.toContain('msg01');
     expect(stripped).not.toContain('msg02');
-    expect(stripped).toContain('msg03');
-    expect(stripped).toContain('msg04');
+    expect(stripped).not.toContain('msg03');
+    expect(stripped).not.toContain('msg04');
     expect(stripped).toContain('msg05');
     expect(stripped).toContain('msg06');
     expect(stripped).toContain('msg07');
@@ -297,7 +304,7 @@ describe('render', () => {
   });
 
   it('player overlays enemies and items at same position', () => {
-    const enemy = makeEnemy({ position: { x: 2, y: 2 } });
+    const enemy = makeEnemy({ position: { x: 25, y: 25 } });
     const state = makeGameState({
       currentFloor: makeFloor({ enemies: [enemy] }),
     });
@@ -319,7 +326,8 @@ describe('renderTitleScreen', () => {
     expect(stripped).toContain('1. New Game');
     expect(stripped).toContain('2. New Game with Seed');
     expect(stripped).toContain('3. View High Scores');
-    expect(stripped).toContain('4. Quit');
+    expect(stripped).toContain('4. Tutorial');
+    expect(stripped).toContain('5. Quit');
   });
 
   it('shows seed when provided', () => {
@@ -400,6 +408,19 @@ describe('renderHelp', () => {
     expect(stripped).toContain('skills');
     expect(stripped).toContain('help');
     expect(stripped).toContain('quit');
+  });
+});
+
+describe('renderTutorial', () => {
+  it('contains tutorial content', () => {
+    const output = renderTutorial();
+    const stripped = stripAnsi(output);
+    expect(stripped).toContain('Welcome to DeepShell');
+    expect(stripped).toContain('Movement');
+    expect(stripped).toContain('Combat');
+    expect(stripped).toContain('Items');
+    expect(stripped).toContain('Progression');
+    expect(stripped).toContain('Skills');
   });
 });
 

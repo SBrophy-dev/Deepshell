@@ -2,6 +2,9 @@ import chalk from 'chalk';
 import type { GameState, RunStats, Perk, Floor, Enemy, ItemPlacement, SkillType } from '../models/index.js';
 import { ASCII_CHARS } from '../models/index.js';
 import { THEME, hpColor, colorizeMessage } from './colors.js';
+import { drawBox, drawBar, padCenter, stripAnsi, ICONS, joinPanelsHorizontally } from './drawing.js';
+
+// ─── Character Helpers ─────────────────────────────────────────────────────────
 
 function enemyChar(enemy: Enemy): string {
   const char = enemy.isBoss
@@ -53,58 +56,7 @@ function tileChar(type: string, char: string): string {
   return colorFn(char);
 }
 
-export function render(state: GameState): string {
-  const { currentFloor, player, messageLog, messageScrollOffset, floorNumber } = state;
-  const lines: string[] = [];
-
-  const mapLines = renderMap(currentFloor, player.position, currentFloor.enemies, currentFloor.items);
-  lines.push(...mapLines);
-
-  lines.push('');
-
-  const weaponName = player.equippedWeapon ? player.equippedWeapon.name : 'none';
-  const armorName = player.equippedArmor ? player.equippedArmor.name : 'none';
-
-  const hpStr = hpColor(player.health, player.maxHealth)(`${player.health}/${player.maxHealth}`);
-  const hud = [
-    `${THEME.hud.label('HP:')} ${hpStr}`,
-    `${THEME.hud.label('Lvl:')} ${THEME.hud.value(String(player.level))}`,
-    `${THEME.hud.label('XP:')} ${THEME.hud.value(String(player.xp))}`,
-    `${THEME.hud.label('Weapon:')} ${THEME.hud.value(weaponName)}`,
-    `${THEME.hud.label('Armor:')} ${THEME.hud.value(armorName)}`,
-    `${THEME.hud.label('Floor:')} ${THEME.hud.value(String(floorNumber))}`,
-  ].join('  ');
-
-  const bossAlive = currentFloor.isBossFloor &&
-    currentFloor.enemies.some(e => e.isBoss && e.health > 0);
-
-  lines.push(bossAlive ? `${hud}  ${THEME.hud.bossFloor('[BOSS FLOOR]')}` : hud);
-
-  lines.push('');
-
-  const visibleLines = 10;
-  const totalMessages = messageLog.length;
-  const maxOffset = Math.max(0, totalMessages - visibleLines);
-  const effectiveOffset = Math.min(messageScrollOffset, maxOffset);
-  
-  const startIndex = Math.max(0, totalMessages - visibleLines - effectiveOffset);
-  const endIndex = totalMessages - effectiveOffset;
-  const displayedMessages = messageLog.slice(startIndex, endIndex);
-  
-  for (const msg of displayedMessages) {
-    lines.push(colorizeMessage(msg));
-  }
-
-  if (effectiveOffset < maxOffset) {
-    const hidden = maxOffset - effectiveOffset;
-    lines.push(chalk.dim(`  ↑ ${hidden} older message${hidden > 1 ? 's' : ''}`));
-  }
-  if (effectiveOffset > 0) {
-    lines.push(chalk.dim(`  ↓ ${effectiveOffset} newer message${effectiveOffset > 1 ? 's' : ''}`));
-  }
-
-  return lines.join('\n');
-}
+// ─── Map Renderer ────────────────────────────────────────────────────────────
 
 function renderMap(
   floor: Floor,
@@ -153,9 +105,141 @@ function renderMap(
   return lines;
 }
 
+// ─── Main Render ─────────────────────────────────────────────────────────────
+
+export function render(state: GameState): string {
+  const { currentFloor, player, messageLog, messageScrollOffset, floorNumber } = state;
+
+  const termCols = process.stdout.columns ?? 80;
+  const mapWidth = currentFloor.grid[0].length;
+  const mapPanelWidth = mapWidth + 2;
+  const rightWidth = termCols - mapPanelWidth - 1; // 1-char gap between panels
+
+  const mapLines = renderMap(currentFloor, player.position, currentFloor.enemies, currentFloor.items);
+  const mapPanel = drawBox(mapLines, {
+    width: mapPanelWidth,
+    title: ` Floor ${floorNumber} `,
+    titleColor: THEME.hud.panelTitle,
+    borderColor: THEME.hud.panelBorder,
+  });
+
+  // ─── Shared Status Content ───────────────────────────────────────────────
+  const weaponName = player.equippedWeapon ? player.equippedWeapon.name : 'none';
+  const armorName = player.equippedArmor ? player.equippedArmor.name : 'none';
+  const bossAlive = currentFloor.isBossFloor && currentFloor.enemies.some(e => e.isBoss && e.health > 0);
+
+  // Bar width adapts to layout
+  const barWidth = rightWidth < 35 ? mapWidth : rightWidth - 2;
+
+  const hpBar = drawBar(
+    'HP',
+    player.health,
+    player.maxHealth,
+    barWidth,
+    hpColor(player.health, player.maxHealth),
+    chalk.hex('#4a4a4a'),
+    THEME.hud.label,
+  );
+
+  const xpMax = Math.max(player.xp, player.level * 100);
+  const xpBar = drawBar(
+    'XP',
+    player.xp,
+    xpMax,
+    barWidth,
+    THEME.hud.xp,
+    THEME.hud.xpEmpty,
+    THEME.hud.label,
+  );
+
+  const bossIndicator = bossAlive ? ` ${THEME.hud.bossFloor('[BOSS FLOOR]')}` : '';
+  const equipLine = `${THEME.hud.label('Wpn:')} ${THEME.hud.value(weaponName)}  ${THEME.hud.label('Arm:')} ${THEME.hud.value(armorName)}  ${THEME.hud.label('Lvl:')} ${THEME.hud.value(String(player.level))}${bossIndicator}`;
+
+  // ─── Fallback Vertical Layout (narrow terminal) ──────────────────────────
+  if (rightWidth < 35) {
+    const statusPanel = drawBox([hpBar, xpBar, equipLine], {
+      width: mapPanelWidth,
+      title: ' Status ',
+      titleColor: THEME.hud.panelTitle,
+      borderColor: THEME.hud.panelBorder,
+    });
+
+    const visibleLines = 8;
+    const totalMessages = messageLog.length;
+    const maxOffset = Math.max(0, totalMessages - visibleLines);
+    const effectiveOffset = Math.min(messageScrollOffset, maxOffset);
+
+    const startIndex = Math.max(0, totalMessages - visibleLines - effectiveOffset);
+    const endIndex = totalMessages - effectiveOffset;
+    const displayedMessages = messageLog.slice(startIndex, endIndex);
+
+    const messageLines = displayedMessages.map(msg => colorizeMessage(msg));
+    if (effectiveOffset < maxOffset) {
+      const hidden = maxOffset - effectiveOffset;
+      messageLines.push(chalk.dim(`  ↑ ${hidden} older message${hidden > 1 ? 's' : ''}`));
+    }
+    if (effectiveOffset > 0) {
+      messageLines.push(chalk.dim(`  ↓ ${effectiveOffset} newer message${effectiveOffset > 1 ? 's' : ''}`));
+    }
+
+    const messagePanel = drawBox(messageLines, {
+      width: mapPanelWidth,
+      title: ' Messages ',
+      titleColor: THEME.hud.panelTitle,
+      borderColor: THEME.hud.panelBorder,
+    });
+
+    const allLines = [...mapPanel, '', ...statusPanel, '', ...messagePanel];
+    return allLines.join('\n');
+  }
+
+  // ─── Side-by-side Horizontal Layout ──────────────────────────────────────
+
+  const statusPanel = drawBox([hpBar, xpBar, equipLine], {
+    width: rightWidth,
+    title: ' Status ',
+    titleColor: THEME.hud.panelTitle,
+    borderColor: THEME.hud.panelBorder,
+  });
+
+  const targetHeight = mapPanel.length;
+  const usedHeight = statusPanel.length + 1; // +1 blank separator line
+  const messageInnerHeight = Math.max(4, targetHeight - usedHeight - 2); // -2 for message box borders
+
+  const totalMessages = messageLog.length;
+  const maxOffset = Math.max(0, totalMessages - messageInnerHeight);
+  const effectiveOffset = Math.min(messageScrollOffset, maxOffset);
+
+  const startIndex = Math.max(0, totalMessages - messageInnerHeight - effectiveOffset);
+  const endIndex = totalMessages - effectiveOffset;
+  const displayedMessages = messageLog.slice(startIndex, endIndex);
+
+  const messageLines = displayedMessages.map(msg => colorizeMessage(msg));
+  if (effectiveOffset < maxOffset) {
+    const hidden = maxOffset - effectiveOffset;
+    messageLines.push(chalk.dim(`  ↑ ${hidden} older message${hidden > 1 ? 's' : ''}`));
+  }
+  if (effectiveOffset > 0) {
+    messageLines.push(chalk.dim(`  ↓ ${effectiveOffset} newer message${effectiveOffset > 1 ? 's' : ''}`));
+  }
+
+  const messagePanel = drawBox(messageLines, {
+    width: rightWidth,
+    title: ' Messages ',
+    titleColor: THEME.hud.panelTitle,
+    borderColor: THEME.hud.panelBorder,
+  });
+
+  // Right column: status on top, messages filling remaining height
+  const rightStack: string[] = [...statusPanel, '', ...messagePanel];
+
+  return joinPanelsHorizontally(mapPanel, rightStack).join('\n');
+}
+
+// ─── Screens ─────────────────────────────────────────────────────────────────
 
 export function renderTitleScreen(seed?: string): string {
-  const lines: string[] = [];
+  const content: string[] = [];
 
   const titleLines = [
     '  ____  _____ _____ ____  ____  _   _ _____ _     _     ',
@@ -165,24 +249,27 @@ export function renderTitleScreen(seed?: string): string {
     ' |____/|_____|_____|_|   |____/|_| |_|_____|_____|_____|',
   ];
 
-  lines.push('');
+  content.push('');
   for (const line of titleLines) {
-    lines.push(THEME.screens.title(line));
+    content.push(THEME.screens.title(line));
   }
-
-  lines.push('');
-  lines.push(`  ${chalk.white('1.')} New Game`);
-  lines.push(`  ${chalk.white('2.')} New Game with Seed`);
-  lines.push(`  ${chalk.white('3.')} View High Scores`);
-  lines.push(`  ${chalk.white('4.')} Quit`);
-  lines.push('');
+  content.push('');
+  content.push(`  ${ICONS.arrow} ${chalk.white('1.')} New Game`);
+  content.push(`  ${ICONS.arrow} ${chalk.white('2.')} New Game with Seed`);
+  content.push(`  ${ICONS.arrow} ${chalk.white('3.')} View High Scores`);
+  content.push(`  ${ICONS.arrow} ${chalk.white('4.')} Tutorial`);
+  content.push(`  ${ICONS.arrow} ${chalk.white('5.')} Quit`);
+  content.push('');
 
   if (seed) {
-    lines.push(`  Current seed: ${chalk.gray(seed)}`);
-    lines.push('');
+    content.push(`  Current seed: ${chalk.gray(seed)}`);
+    content.push('');
   }
 
-  return lines.join('\n');
+  const maxLen = Math.max(...content.map(l => stripAnsi(l).length));
+  const boxWidth = Math.min(80, Math.max(60, maxLen + 4));
+
+  return drawBox(content, { width: boxWidth, title: ' DeepShell ', titleColor: THEME.screens.title, borderColor: THEME.hud.panelBorder }).join('\n');
 }
 
 export function renderGameOver(stats: RunStats, seed: string): string {
@@ -190,22 +277,26 @@ export function renderGameOver(stats: RunStats, seed: string): string {
   const skillTypes: SkillType[] = ['melee', 'ranged', 'defense', 'stealth', 'perception'];
 
   lines.push('');
-  lines.push(`  ${THEME.screens.gameOver('=== GAME OVER ===')}`);
+  lines.push(padCenter(THEME.screens.gameOver('=== GAME OVER ==='), 50));
   lines.push('');
-  lines.push(`  ${THEME.screens.gameOverLabel('Floors Cleared:')} ${chalk.white(stats.floorsCleared)}`);
-  lines.push(`  ${THEME.screens.gameOverLabel('Enemies Defeated:')} ${chalk.white(stats.enemiesDefeated)}`);
-  lines.push(`  ${THEME.screens.gameOverLabel('Bosses Defeated:')} ${chalk.white(stats.bossesDefeated)}`);
+  lines.push(`  ${THEME.screens.gameOverLabel('Floors Cleared:')} ${chalk.white(String(stats.floorsCleared))}`);
+  lines.push(`  ${THEME.screens.gameOverLabel('Enemies Defeated:')} ${chalk.white(String(stats.enemiesDefeated))}`);
+  lines.push(`  ${THEME.screens.gameOverLabel('Bosses Defeated:')} ${chalk.white(String(stats.bossesDefeated))}`);
   lines.push('');
   lines.push(`  ${THEME.screens.gameOverLabel('Highest Skill Levels:')}`);
   for (const skill of skillTypes) {
     const label = skill.charAt(0).toUpperCase() + skill.slice(1);
-    lines.push(`    ${THEME.screens.gameOverLabel(label + ':')} ${chalk.white(stats.highestSkillLevels[skill])}`);
+    const value = String(stats.highestSkillLevels[skill]);
+    lines.push(`    ${THEME.screens.gameOverLabel(label + ':')} ${chalk.white(value)}`);
   }
   lines.push('');
   lines.push(`  ${THEME.screens.gameOverLabel('Seed:')} ${chalk.gray(seed)}`);
   lines.push('');
 
-  return lines.join('\n');
+  const maxLen = Math.max(...lines.map(l => stripAnsi(l).length));
+  const boxWidth = Math.min(80, Math.max(50, maxLen + 4));
+
+  return drawBox(lines, { width: boxWidth, title: ' Rest In Pieces ', titleColor: THEME.screens.gameOver, borderColor: THEME.hud.panelBorder }).join('\n');
 }
 
 export function renderPerkSelection(perks: Perk[]): string {
@@ -219,39 +310,86 @@ export function renderPerkSelection(perks: Perk[]): string {
   }
   lines.push('');
 
-  return lines.join('\n');
+  const maxLen = Math.max(...lines.map(l => stripAnsi(l).length));
+  const boxWidth = Math.min(80, Math.max(50, maxLen + 4));
+
+  return drawBox(lines, { width: boxWidth, title: ' Level Up! ', titleColor: THEME.screens.perkName, borderColor: THEME.hud.panelBorder }).join('\n');
 }
 
 export function renderHelp(): string {
   const lines: string[] = [];
+  const width = 76;
+  const innerWidth = width - 2;
 
   lines.push('');
-  lines.push(`  ${chalk.bold.cyan('Available Commands:')}`);
-  lines.push('');
-  lines.push('  north/south/east/west (n/s/e/w) [count] - Move');
-  lines.push('  attack [count]                          - Attack adjacent enemy');
-  lines.push('  shoot [direction]                       - Fire ranged weapon');
-  lines.push('  inventory                               - List your items');
-  lines.push('  equip [item]                            - Equip weapon/armor');
-  lines.push('  unequip [weapon/armor]                  - Unequip from slot');
-  lines.push('  use [item]                              - Use consumable');
-  lines.push('  drop [item]                             - Drop item');
-  lines.push('  pickup                                  - Pick up item');
-  lines.push('  look                                    - Describe surroundings');
-  lines.push('  inspect [target]                        - Inspect enemy/item');
-  lines.push('  skills                                  - Show skill levels');
-  lines.push('  messages                                - Show full message log');
-  lines.push('  scroll [up|down|top|bottom]             - Scroll messages');
-  lines.push('  help                                    - Show this message');
-  lines.push('  quit                                    - End the game');
+  lines.push(padCenter(THEME.screens.title('Available Commands'), innerWidth));
   lines.push('');
 
-  return lines.join('\n');
+  const commands: [string, string][] = [
+    ['north/south/east/west (n/s/e/w) [count]', 'Move in a direction'],
+    ['attack [count]', 'Attack an adjacent enemy'],
+    ['shoot [direction]', 'Fire ranged weapon'],
+    ['inventory', 'List your items'],
+    ['equip [item]', 'Equip weapon or armor'],
+    ['unequip [weapon/armor]', 'Unequip from slot'],
+    ['use [item]', 'Use a consumable'],
+    ['drop [item]', 'Drop item on floor'],
+    ['pickup', 'Pick up item at your position'],
+    ['look', 'Describe your surroundings'],
+    ['inspect [target]', 'Inspect enemy or item'],
+    ['skills', 'Show skill levels'],
+    ['messages', 'Show full message history'],
+    ['scroll [up|down|top|bottom]', 'Scroll messages'],
+    ['help', 'Show this message'],
+    ['quit', 'End the game'],
+  ];
+
+  const col1Width = 38;
+  for (const [cmd, desc] of commands) {
+    lines.push(`  ${padCenter(THEME.messages.system(cmd), col1Width)} ${THEME.messages.info(desc)}`);
+  }
+  lines.push('');
+
+  return drawBox(lines, { width, title: ' Help ', titleColor: THEME.hud.panelTitle, borderColor: THEME.hud.panelBorder }).join('\n');
+}
+
+export function renderTutorial(): string {
+  const lines: string[] = [];
+  const width = 76;
+  const innerWidth = width - 2;
+
+  lines.push('');
+  lines.push(padCenter(THEME.screens.tutorialHeader('Welcome to DeepShell!'), innerWidth));
+  lines.push('');
+  lines.push(THEME.screens.tutorialText('DeepShell is a roguelike dungeon crawler played entirely in your terminal.'));
+  lines.push('');
+  lines.push(THEME.screens.tutorialHighlight('► Movement:'));
+  lines.push(THEME.screens.tutorialText('  Use north, south, east, west (or n, s, e, w) to move.'));
+  lines.push(THEME.screens.tutorialText('  Add a number to repeat: "east 5" moves 5 tiles.'));
+  lines.push('');
+  lines.push(THEME.screens.tutorialHighlight('► Combat:'));
+  lines.push(THEME.screens.tutorialText('  "attack" hits an adjacent enemy. "shoot <direction>" fires a ranged weapon.'));
+  lines.push('');
+  lines.push(THEME.screens.tutorialHighlight('► Items:'));
+  lines.push(THEME.screens.tutorialText('  Walk over items to find them. Use "pickup" to grab them.'));
+  lines.push(THEME.screens.tutorialText('  "inventory" shows your items. "equip <item>" to ready a weapon.'));
+  lines.push('');
+  lines.push(THEME.screens.tutorialHighlight('► Progression:'));
+  lines.push(THEME.screens.tutorialText('  Find the > stairs to descend. Every 5 floors is a Boss Floor!'));
+  lines.push(THEME.screens.tutorialText('  After each floor, choose a perk to grow stronger.'));
+  lines.push('');
+  lines.push(THEME.screens.tutorialHighlight('► Skills:'));
+  lines.push(THEME.screens.tutorialText('  Melee, Ranged, Defense, Stealth, and Perception level up as you play.'));
+  lines.push('');
+  lines.push(THEME.screens.tutorialText('Good luck, adventurer. How deep can you go?'));
+  lines.push('');
+
+  return drawBox(lines, { width, title: ' Tutorial ', titleColor: THEME.screens.tutorialHeader, borderColor: THEME.hud.panelBorder }).join('\n');
 }
 
 export function checkTerminalSize(cols: number, rows: number): string | null {
   if (cols < 80 || rows < 24) {
-    return chalk.yellow(`Terminal too small (${cols}x${rows}). Please resize to at least 80x24.`);
+    return chalk.yellow(`⚠ Terminal too small (${cols}x${rows}). Please resize to at least 80x24 for the best experience.`);
   }
   return null;
 }

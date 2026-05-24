@@ -7,6 +7,8 @@ import {
   renderTitleScreen,
   renderGameOver,
   renderPerkSelection,
+  renderHelp,
+  renderTutorial,
   checkTerminalSize,
 } from './ui/renderer.js';
 import type { GameState, ParsedCommand, RunRecord } from './models/index.js';
@@ -28,7 +30,23 @@ function clearScreen(): void {
   process.stdout.write('\x1Bc');
 }
 
-// ─── High Scores Display ────────────────────────────────────────────────────
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function typewriter(text: string, speed = 20): Promise<void> {
+  for (const char of text) {
+    process.stdout.write(char);
+    await sleep(speed);
+  }
+  process.stdout.write('\n');
+}
+
+function padLeft(str: string, len: number): string {
+  return str.length >= len ? str : ' '.repeat(len - str.length) + str;
+}
+
+// ─── High Scores Display ─────────────────────────────────────────────────────
 
 function displayHighScores(): void {
   const scores = getHighScores(10);
@@ -39,37 +57,65 @@ function displayHighScores(): void {
   console.log('\n  === HIGH SCORES ===\n');
   for (let i = 0; i < scores.length; i++) {
     const s = scores[i];
-    console.log(`  ${i + 1}. Floors: ${s.floorsCleared}  Enemies: ${s.enemiesDefeated}  Bosses: ${s.bossesDefeated}  Seed: ${s.seed}  Date: ${s.date}`);
+    const date = new Date(s.date).toLocaleDateString();
+    console.log(
+      `  ${padLeft(String(i + 1), 2)}.  Floors: ${padLeft(String(s.floorsCleared), 3)}  Enemies: ${padLeft(String(s.enemiesDefeated), 3)}  Bosses: ${padLeft(String(s.bossesDefeated), 2)}  Seed: ${s.seed}  ${date}`,
+    );
   }
   console.log('');
+}
+
+// ─── Intro Cinematic ─────────────────────────────────────────────────────────
+
+async function introCinematic(): Promise<void> {
+  clearScreen();
+  await typewriter('  Establishing neural link...', 25);
+  await sleep(150);
+  await typewriter('  Synchronizing with the DeepShell...', 25);
+  await sleep(200);
+  await typewriter('  Welcome, operative.', 35);
+  await sleep(400);
 }
 
 // ─── Title Screen ────────────────────────────────────────────────────────────
 
 async function showTitleScreen(): Promise<void> {
-  while (true) {
-    clearScreen();
-    process.stdout.write(renderTitleScreen());
-
-    const input = (await prompt('> ')).trim().toLowerCase();
-
-    if (input === '1' || input === 'new') {
-      await runGameLoop(initNewGame());
-    } else if (input === '2' || input === 'seed') {
-      const seed = (await prompt('  Enter seed: ')).trim();
-      if (seed.length > 0) {
-        await runGameLoop(initNewGame(seed));
-      } else {
-        await runGameLoop(initNewGame());
-      }
-    } else if (input === '3' || input === 'scores') {
+  try {
+    while (true) {
       clearScreen();
-      displayHighScores();
-      await prompt('  Press Enter to continue...');
-    } else if (input === '4' || input === 'quit') {
-      rl.close();
-      process.exit(0);
+      process.stdout.write(renderTitleScreen() + '\n');
+
+      const input = (await prompt('◆ ')).trim().toLowerCase();
+
+      if (input === '1' || input === 'new') {
+        await runGameLoop(initNewGame());
+      } else if (input === '2' || input === 'seed') {
+        const seed = (await prompt('  Enter seed: ')).trim();
+        if (seed.length > 0) {
+          await runGameLoop(initNewGame(seed));
+        } else {
+          await runGameLoop(initNewGame());
+        }
+      } else if (input === '3' || input === 'scores') {
+        clearScreen();
+        displayHighScores();
+        await prompt('  Press Enter to continue...');
+      } else if (input === '4' || input === 'tutorial') {
+        clearScreen();
+        process.stdout.write(renderTutorial() + '\n');
+        await prompt('  Press Enter to continue...');
+      } else if (input === '5' || input === 'quit') {
+        console.log('\nGoodbye!');
+        return;
+      }
     }
+  } catch (err) {
+    // Gracefully handle stdin closing (e.g., piped input)
+    const e = err as Error & { code?: string };
+    if (e.code === 'ERR_USE_AFTER_CLOSE') {
+      return;
+    }
+    throw err;
   }
 }
 
@@ -83,10 +129,10 @@ async function runGameLoop(initialState: GameState): Promise<void> {
     process.stdout.write(render(state) + '\n');
 
     if (state.gamePhase === 'perkSelection' && state.perkChoices) {
-      process.stdout.write(renderPerkSelection(state.perkChoices));
+      process.stdout.write(renderPerkSelection(state.perkChoices) + '\n');
     }
 
-    const input = await prompt('> ');
+    const input = await prompt('◆ ');
     const trimmed = input.trim();
 
     if (trimmed.length === 0) continue;
@@ -109,6 +155,15 @@ async function runGameLoop(initialState: GameState): Promise<void> {
       continue;
     }
 
+    // Handle help as an overlay without cluttering the log
+    if (parsed.action === 'help') {
+      clearScreen();
+      process.stdout.write(render(state) + '\n\n');
+      process.stdout.write(renderHelp() + '\n');
+      await prompt('  Press Enter to continue...');
+      continue;
+    }
+
     const scrollCommand = parsed.action === 'scroll';
     const prevLogLength = state.messageLog.length;
 
@@ -124,7 +179,8 @@ async function runGameLoop(initialState: GameState): Promise<void> {
 
     if (state.gamePhase === 'gameOver') {
       clearScreen();
-      process.stdout.write(renderGameOver(state.runStats, state.seed));
+      await sleep(600);
+      process.stdout.write(renderGameOver(state.runStats, state.seed) + '\n');
 
       const record: RunRecord = {
         date: new Date().toISOString(),
@@ -144,8 +200,7 @@ async function runGameLoop(initialState: GameState): Promise<void> {
 
 // ─── Entry Point ─────────────────────────────────────────────────────────────
 
-function main(): void {
-  // Check terminal size
+async function main(): Promise<void> {
   const cols = process.stdout.columns ?? 80;
   const rows = process.stdout.rows ?? 24;
   const sizeWarning = checkTerminalSize(cols, rows);
@@ -160,11 +215,16 @@ function main(): void {
     process.exit(0);
   });
 
-  showTitleScreen().catch((err) => {
+  await introCinematic();
+
+  try {
+    await showTitleScreen();
+  } catch (err) {
     console.error('Fatal error:', err);
-    rl.close();
     process.exit(1);
-  });
+  } finally {
+    rl.close();
+  }
 }
 
 main();
