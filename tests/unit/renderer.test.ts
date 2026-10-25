@@ -206,8 +206,8 @@ describe('render', () => {
     const output = render(state);
     const stripped = stripAnsi(output);
     // Map row 3 inside the box should not have 'm' at the enemy position
-    expect(stripped).not.toContain('│#..m');
-    expect(stripped).toContain('│#...');
+    expect(stripped).not.toContain('│█··m');
+    expect(stripped).toContain('│█···');
   });
 
   it('renders items with correct characters', () => {
@@ -316,8 +316,8 @@ describe('render', () => {
 describe('renderTitleScreen', () => {
   it('contains DEEPSHELL title in ASCII art', () => {
     const output = renderTitleScreen();
-    expect(stripAnsi(output)).toContain('____/');
-    expect(stripAnsi(output)).toContain('|_____|');
+    expect(stripAnsi(output)).toContain('██████╗');
+    expect(stripAnsi(output)).toContain('╚══════╝');
   });
 
   it('contains all menu options', () => {

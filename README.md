@@ -16,13 +16,16 @@ A polished CLI roguelike dungeon crawler built in TypeScript. Explore procedural
 
 ## UI Features
 
+- **Depth-Themed Interface**: The whole UI shifts hue as you descend through five named strata — The Shallows, The Fathoms, The Veins, The Furnace, and The Abyss — one per boss cycle
+- **Dynamic Map Lighting**: A light radius glows around your character; walls bordering open space catch the light while solid rock fades into darkness
 - **Responsive Panel Layout**: Wide terminals show the map, status, and messages side-by-side; narrow terminals fall back to a clean stacked view
-- **Visual Status Bars**: HP and XP bars with dynamic color shifts (green → yellow → red)
-- **Box-Drawn Panels**: Unicode border frames surround every screen element for a crisp, organized look
-- **Contextual Message Icons**: Combat, loot, level-ups, movement, and warnings each get their own icon and color
-- **Help Overlay**: `help` opens a clean command reference overlay without cluttering your message log
-- **Built-in Tutorial**: New players can jump straight into a guided tutorial from the title screen
-- **Cinematic Boot Sequence**: A typewriter-style intro welcomes you into the DeepShell
+- **Smooth Status Bars**: HP and XP bars with sub-character resolution and a continuous red → amber → green health gradient
+- **Depth Gauge**: Status pips track your progress through each 5-floor boss cycle, with a warning banner on boss floors
+- **Box-Drawn Panels**: Rounded frames for play, double-line frames for dramatic moments (level-ups, game over, the Hall of the Deep)
+- **Fading Message Log**: Contextual icons and colors for combat, loot, and level-ups; older messages sink into the dark
+- **Help Overlay**: `help` opens a categorized command reference without cluttering your message log
+- **Built-in Tutorial**: A guided tutorial with a color-coded map legend, straight from the title screen
+- **Cinematic Boot Sequence**: A typewriter boot log syncs your neural link before the descent begins
 
 ## Screenshots
 
@@ -86,16 +89,16 @@ npm start
 | `help` | `?` | Show help overlay |
 | `quit` | `q` | End the game |
 
-## ASCII Legend
+## Map Legend
 
 | Symbol | Meaning |
 |--------|---------|
 | `@` | Player |
-| `#` | Wall |
-| `.` | Floor/Corridor |
+| `█` | Wall (lit by your presence; unbroken rock stays dark) |
+| `·` | Floor/Corridor |
 | `+` | Door |
-| `<` | Stairs up (entry) |
-| `>` | Stairs down (exit) |
+| `▲` | Stairs up (entry) |
+| `▼` | Stairs down (exit) |
 | `m` | Melee enemy |
 | `r` | Ranged enemy |
 | `p` | Patrol enemy |

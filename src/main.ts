@@ -1,4 +1,5 @@
 import * as readline from 'node:readline';
+import chalk from 'chalk';
 import { initNewGame, processCommand } from './systems/gameEngine.js';
 import { parseCommand } from './systems/commandParser.js';
 import { saveRunRecord, getHighScores } from './systems/persistence.js';
@@ -9,8 +10,10 @@ import {
   renderPerkSelection,
   renderHelp,
   renderTutorial,
+  renderHighScores,
   checkTerminalSize,
 } from './ui/renderer.js';
+import { THEME, depthTheme } from './ui/colors.js';
 import type { GameState, ParsedCommand, RunRecord } from './models/index.js';
 
 // ─── Readline Setup ──────────────────────────────────────────────────────────
@@ -34,47 +37,44 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function typewriter(text: string, speed = 20): Promise<void> {
-  for (const char of text) {
-    process.stdout.write(char);
-    await sleep(speed);
-  }
-  process.stdout.write('\n');
-}
+const TITLE_PROMPT = THEME.screens.prompt('◆ ');
+const CONTINUE_HINT = THEME.hud.dim('  ▸ press Enter to continue ');
 
-function padLeft(str: string, len: number): string {
-  return str.length >= len ? str : ' '.repeat(len - str.length) + str;
-}
-
-// ─── High Scores Display ─────────────────────────────────────────────────────
-
-function displayHighScores(): void {
-  const scores = getHighScores(10);
-  if (scores.length === 0) {
-    console.log('\n  No run history available.\n');
-    return;
-  }
-  console.log('\n  === HIGH SCORES ===\n');
-  for (let i = 0; i < scores.length; i++) {
-    const s = scores[i];
-    const date = new Date(s.date).toLocaleDateString();
-    console.log(
-      `  ${padLeft(String(i + 1), 2)}.  Floors: ${padLeft(String(s.floorsCleared), 3)}  Enemies: ${padLeft(String(s.enemiesDefeated), 3)}  Bosses: ${padLeft(String(s.bossesDefeated), 2)}  Seed: ${s.seed}  ${date}`,
-    );
-  }
-  console.log('');
+function gamePrompt(state: GameState): string {
+  return depthTheme(state.floorNumber).accent('◆ ');
 }
 
 // ─── Intro Cinematic ─────────────────────────────────────────────────────────
 
+async function typeOut(text: string, colorFn: (s: string) => string, speed = 14): Promise<void> {
+  for (const char of text) {
+    process.stdout.write(colorFn(char));
+    await sleep(speed);
+  }
+}
+
+async function bootStep(label: string, padTo = 38): Promise<void> {
+  process.stdout.write(THEME.hud.dim('  ▸ '));
+  await typeOut(label, (s) => THEME.hud.value(s), 12);
+  const dots = Math.max(2, padTo - label.length);
+  for (let i = 0; i < dots; i++) {
+    process.stdout.write(THEME.hud.dim('·'));
+    await sleep(4);
+  }
+  process.stdout.write(' ' + chalk.hex('#2ed573')('[ok]') + '\n');
+  await sleep(90);
+}
+
 async function introCinematic(): Promise<void> {
   clearScreen();
-  await typewriter('  Establishing neural link...', 25);
-  await sleep(150);
-  await typewriter('  Synchronizing with the DeepShell...', 25);
-  await sleep(200);
-  await typewriter('  Welcome, operative.', 35);
-  await sleep(400);
+  process.stdout.write('\n');
+  await bootStep('establishing neural link');
+  await bootStep('mapping subterranean lattice');
+  await bootStep('synchronizing with the DeepShell');
+  process.stdout.write('\n  ');
+  await typeOut('▼ commencing descent', (s) => THEME.screens.title(s), 28);
+  process.stdout.write('\n');
+  await sleep(450);
 }
 
 // ─── Title Screen ────────────────────────────────────────────────────────────
@@ -85,12 +85,12 @@ async function showTitleScreen(): Promise<void> {
       clearScreen();
       process.stdout.write(renderTitleScreen() + '\n');
 
-      const input = (await prompt('◆ ')).trim().toLowerCase();
+      const input = (await prompt(TITLE_PROMPT)).trim().toLowerCase();
 
       if (input === '1' || input === 'new') {
         await runGameLoop(initNewGame());
       } else if (input === '2' || input === 'seed') {
-        const seed = (await prompt('  Enter seed: ')).trim();
+        const seed = (await prompt(THEME.hud.label('  seed ◆ '))).trim();
         if (seed.length > 0) {
           await runGameLoop(initNewGame(seed));
         } else {
@@ -98,14 +98,14 @@ async function showTitleScreen(): Promise<void> {
         }
       } else if (input === '3' || input === 'scores') {
         clearScreen();
-        displayHighScores();
-        await prompt('  Press Enter to continue...');
+        process.stdout.write('\n' + renderHighScores(getHighScores(10)) + '\n\n');
+        await prompt(CONTINUE_HINT);
       } else if (input === '4' || input === 'tutorial') {
         clearScreen();
         process.stdout.write(renderTutorial() + '\n');
-        await prompt('  Press Enter to continue...');
+        await prompt(CONTINUE_HINT);
       } else if (input === '5' || input === 'quit') {
-        console.log('\nGoodbye!');
+        console.log('\n' + THEME.screens.prompt('◆ ') + THEME.hud.dim('Resurfacing. The DeepShell will be waiting.'));
         return;
       }
     }
@@ -132,7 +132,7 @@ async function runGameLoop(initialState: GameState): Promise<void> {
       process.stdout.write(renderPerkSelection(state.perkChoices) + '\n');
     }
 
-    const input = await prompt('◆ ');
+    const input = await prompt(gamePrompt(state));
     const trimmed = input.trim();
 
     if (trimmed.length === 0) continue;
@@ -160,7 +160,7 @@ async function runGameLoop(initialState: GameState): Promise<void> {
       clearScreen();
       process.stdout.write(render(state) + '\n\n');
       process.stdout.write(renderHelp() + '\n');
-      await prompt('  Press Enter to continue...');
+      await prompt(CONTINUE_HINT);
       continue;
     }
 
@@ -180,7 +180,7 @@ async function runGameLoop(initialState: GameState): Promise<void> {
     if (state.gamePhase === 'gameOver') {
       clearScreen();
       await sleep(600);
-      process.stdout.write(renderGameOver(state.runStats, state.seed) + '\n');
+      process.stdout.write('\n' + renderGameOver(state.runStats, state.seed) + '\n\n');
 
       const record: RunRecord = {
         date: new Date().toISOString(),
@@ -192,7 +192,7 @@ async function runGameLoop(initialState: GameState): Promise<void> {
       };
       saveRunRecord(record);
 
-      await prompt('  Press Enter to continue...');
+      await prompt(CONTINUE_HINT);
       return;
     }
   }
@@ -210,7 +210,7 @@ async function main(): Promise<void> {
 
   // Handle Ctrl+C gracefully
   process.on('SIGINT', () => {
-    console.log('\nGoodbye!');
+    console.log('\n' + THEME.screens.prompt('◆ ') + THEME.hud.dim('Resurfacing. The DeepShell will be waiting.'));
     rl.close();
     process.exit(0);
   });

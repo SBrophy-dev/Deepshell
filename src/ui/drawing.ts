@@ -2,6 +2,27 @@ import chalk, { type ChalkInstance } from 'chalk';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
+export type BoxStyle = 'single' | 'round' | 'double' | 'heavy';
+
+interface BoxChars {
+  h: string;
+  v: string;
+  tl: string;
+  tr: string;
+  bl: string;
+  br: string;
+  capL: string;
+  capR: string;
+}
+
+export const BOX_STYLES: Record<BoxStyle, BoxChars> = {
+  single: { h: '─', v: '│', tl: '┌', tr: '┐', bl: '└', br: '┘', capL: '┤', capR: '├' },
+  round: { h: '─', v: '│', tl: '╭', tr: '╮', bl: '╰', br: '╯', capL: '┤', capR: '├' },
+  double: { h: '═', v: '║', tl: '╔', tr: '╗', bl: '╚', br: '╝', capL: '╣', capR: '╠' },
+  heavy: { h: '━', v: '┃', tl: '┏', tr: '┓', bl: '┗', br: '┛', capL: '┫', capR: '┣' },
+} as const;
+
+// Kept for backwards compatibility — the classic single-line set.
 export const BOX = {
   h: '─',
   v: '│',
@@ -27,7 +48,11 @@ export const ICONS = {
   perk: '★',
   boss: '☠',
   warning: '⚠',
-  arrow: '►',
+  arrow: '▸',
+  diamond: '◆',
+  diamondHollow: '◇',
+  descend: '▼',
+  ascend: '▲',
 } as const;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -112,6 +137,8 @@ export interface BoxOptions {
   titleColor?: ChalkInstance;
   borderColor?: ChalkInstance;
   padding?: number;
+  style?: BoxStyle;
+  titleAlign?: 'left' | 'center';
 }
 
 export function drawBox(lines: string[], options: BoxOptions): string[] {
@@ -121,36 +148,38 @@ export function drawBox(lines: string[], options: BoxOptions): string[] {
     titleColor = chalk.gray,
     borderColor = chalk.gray,
     padding = 0,
+    style = 'round',
+    titleAlign = 'center',
   } = options;
 
+  const chars = BOX_STYLES[style];
   const innerWidth = width - 2 - padding * 2;
   const result: string[] = [];
 
-  // Top border
+  // Top border — titles are seated into the frame with cap characters: ─┤ Title ├─
   let top = '';
   if (title) {
     const titlePlain = stripAnsi(title);
-    const titleWidth = titlePlain.length;
-    if (titleWidth + 4 <= width - 2) {
-      const left = Math.floor((width - 2 - titleWidth - 2) / 2);
-      const right = width - 2 - titleWidth - 2 - left;
+    const titleWidth = titlePlain.length + 2; // +2 for cap characters
+    if (titleWidth + 2 <= width - 2) {
+      const remaining = width - 2 - titleWidth;
+      const left = titleAlign === 'left' ? Math.min(2, remaining) : Math.floor(remaining / 2);
+      const right = remaining - left;
       top =
-        borderColor(BOX.tl + repeat(BOX.h, left)) +
-        ' ' +
+        borderColor(chars.tl + repeat(chars.h, left) + chars.capL) +
         titleColor(title) +
-        ' ' +
-        borderColor(repeat(BOX.h, right) + BOX.tr);
+        borderColor(chars.capR + repeat(chars.h, right) + chars.tr);
     } else {
-      top = borderColor(BOX.tl + repeat(BOX.h, width - 2) + BOX.tr);
+      top = borderColor(chars.tl + repeat(chars.h, width - 2) + chars.tr);
     }
   } else {
-    top = borderColor(BOX.tl + repeat(BOX.h, width - 2) + BOX.tr);
+    top = borderColor(chars.tl + repeat(chars.h, width - 2) + chars.tr);
   }
   result.push(top);
 
   // Padding top
   for (let p = 0; p < padding; p++) {
-    result.push(borderColor(BOX.v) + repeat(' ', width - 2) + borderColor(BOX.v));
+    result.push(borderColor(chars.v) + repeat(' ', width - 2) + borderColor(chars.v));
   }
 
   // Content (preserve ANSI codes)
@@ -162,35 +191,65 @@ export function drawBox(lines: string[], options: BoxOptions): string[] {
     } else {
       content = line + repeat(' ', innerWidth - plain.length);
     }
-    result.push(borderColor(BOX.v) + repeat(' ', padding) + content + repeat(' ', padding) + borderColor(BOX.v));
+    result.push(borderColor(chars.v) + repeat(' ', padding) + content + repeat(' ', padding) + borderColor(chars.v));
   }
 
   // Padding bottom
   for (let p = 0; p < padding; p++) {
-    result.push(borderColor(BOX.v) + repeat(' ', width - 2) + borderColor(BOX.v));
+    result.push(borderColor(chars.v) + repeat(' ', width - 2) + borderColor(chars.v));
   }
 
   // Bottom border
-  const bottom = BOX.bl + repeat(BOX.h, width - 2) + BOX.br;
+  const bottom = chars.bl + repeat(chars.h, width - 2) + chars.br;
   result.push(borderColor(bottom));
 
   return result;
 }
 
 export function drawCompactBox(lines: string[], width: number, borderColor = chalk.gray): string[] {
+  const chars = BOX_STYLES.round;
   const result: string[] = [];
-  result.push(borderColor(BOX.tl + repeat(BOX.h, width - 2) + BOX.tr));
+  result.push(borderColor(chars.tl + repeat(chars.h, width - 2) + chars.tr));
   for (const line of lines) {
     const innerWidth = width - 2;
     const plain = stripAnsi(line);
     const content = padRight(plain.length > innerWidth ? plain.slice(0, innerWidth) : plain, innerWidth);
-    result.push(borderColor(BOX.v) + content + borderColor(BOX.v));
+    result.push(borderColor(chars.v) + content + borderColor(chars.v));
   }
-  result.push(borderColor(BOX.bl + repeat(BOX.h, width - 2) + BOX.br));
+  result.push(borderColor(chars.bl + repeat(chars.h, width - 2) + chars.br));
   return result;
 }
 
 // ─── Bars ────────────────────────────────────────────────────────────────────
+
+// Sub-character resolution: each cell can be filled in eighths.
+const BAR_FRACTIONS = ['▏', '▎', '▍', '▌', '▋', '▊', '▉'] as const;
+
+function smoothFill(
+  current: number,
+  max: number,
+  width: number,
+  filledColor: ChalkInstance,
+  emptyColor: ChalkInstance,
+): string {
+  const ratio = max > 0 ? Math.min(1, Math.max(0, current / max)) : 0;
+  const exact = width * ratio;
+  let full = Math.floor(exact);
+  const fracIdx = Math.round((exact - full) * 8);
+
+  let partial = '';
+  if (fracIdx >= 8) {
+    full += 1;
+  } else if (fracIdx > 0 && full < width) {
+    partial = BAR_FRACTIONS[fracIdx - 1];
+  }
+
+  const empty = width - full - (partial ? 1 : 0);
+  return (
+    filledColor(repeat('█', full) + partial) +
+    emptyColor(repeat('░', empty))
+  );
+}
 
 export function drawBar(
   label: string,
@@ -204,13 +263,7 @@ export function drawBar(
   const plainLabel = stripAnsi(label);
   const valueText = ` ${current}/${max}`;
   const barWidth = Math.max(4, width - plainLabel.length - valueText.length - 3); // 3 for brackets and space
-  const ratio = max > 0 ? current / max : 0;
-  const filledCount = Math.round(barWidth * ratio);
-  const emptyCount = barWidth - filledCount;
-
-  const bar =
-    filledColor(repeat('█', filledCount)) + emptyColor(repeat('░', emptyCount));
-
+  const bar = smoothFill(current, max, barWidth, filledColor, emptyColor);
   return `${labelColor(label)} [${bar}]${valueText}`;
 }
 
@@ -221,10 +274,7 @@ export function drawMiniBar(
   filledColor: ChalkInstance,
   emptyColor: ChalkInstance,
 ): string {
-  const ratio = max > 0 ? current / max : 0;
-  const filledCount = Math.round(width * ratio);
-  const emptyCount = width - filledCount;
-  return filledColor(repeat('█', filledCount)) + emptyColor(repeat('░', emptyCount));
+  return smoothFill(current, max, width, filledColor, emptyColor);
 }
 
 // ─── Layout ──────────────────────────────────────────────────────────────────
